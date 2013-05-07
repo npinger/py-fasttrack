@@ -63,7 +63,11 @@ Example Usage
     tracker = create_analytic_backend({
         "backend": "fasttrack.backends.redis.Redis",
         "settings": {
-            "hosts": [{"db": 5}]
+            "default": {
+                'host': 'localhost',
+                'port': 6379,
+                'db': 0,
+            }
         },
     })
 
