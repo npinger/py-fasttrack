@@ -17,6 +17,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
+import functools
 
 
 # import_string comes form Werkzeug
@@ -44,3 +45,37 @@ def import_string(import_name, silent=False):
     except (ImportError, AttributeError):
         if not silent:
             raise
+
+
+class memoized(object):
+    """
+    Decorator that caches a function's return value each time it is called.
+    If called later with the same arguments, the cached value is returned, and
+    not re-evaluated.
+    """
+    def __init__(self, func):
+        self.func = func
+        self.cache = {}
+
+    def __call__(self, *args, **kwargs):
+        if kwargs:  # frozenset is used to ensure hashability
+            key = args, frozenset(kwargs.iteritems())
+        else:
+            key = args
+
+        if key in self.cache:
+            return self.cache[key]
+        else:
+            self.cache[key] = result = self.func(*args, **kwargs)
+            return result
+
+    def __get__(self, obj, objtype):
+        """
+        Support instance methods.
+        """
+        fn = functools.partial(self.__call__, obj)
+        fn.reset = self._reset
+        return fn
+
+    def _reset(self):
+        self.cache = {}
