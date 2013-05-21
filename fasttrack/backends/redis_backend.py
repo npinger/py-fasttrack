@@ -66,32 +66,63 @@ class Redis(BaseAnalyticsBackend):
         Creates a new hashkey given a uid and a path type.
 
         Format of returned value is:
-        'ttr:<uid>|item:<path_type>'
+        'ttr:<uid>|item:<event>'
         """
         return "ttr:%s|item:%s" % (str(uid), path_type)
+
+    def _clean_string(self, s):
+        """
+        Replaces reserved characters: "#" with "!!hash!!" and "|" with "!!bar!!"
+        and returns the edited string.
+        """
+        if type(s) == int:
+            pass
+        elif type(s) == str:
+            if "#" in s:
+                s = s.replace('#', '!!hash!!')
+            if "|" in s:
+                s = s.replace('|', '!!bar!!')
+
+        return s
+
+    def _reverse_clean_string(self, s):
+        """
+        Reverses actions of the _clean_string() method.  Replaces
+        "!!hash!!" with "#" and "!!bar!!" with "|" and returns the
+        modified string.
+        """
+        if '!!hash!!' in s:
+            s = s.replace('!!hash!!', '#')
+        if '!!bar!!' in s:
+            s = s.replace('!!bar!!', '|')
+        return s
 
     def _dict_to_string(self, d):
         """
         Takes a dict of the format:
 
-        {'direct_signup:pro_gold': 1, 'choose_tier:pro': 2}
+        {'event1': 1, 'event2': 2}
+            or
+        {'event1': 'descriptivestring1', 'event2': 'descriptivestring1'}
 
         Returns our path format (shown above in the class description)
         """
         l = []
         for p, n in d.iteritems():
+            p = self._clean_string(p)
+            n = self._clean_string(n)
             l.append('%s#%s' % (p, n))
 
         return '|'.join(l)
 
     def _string_to_dict(self, s):
         """
-        Takes a string of the format <path>#<X>|<path2>#<X2>|...
+        Takes a string of the format <event>#<X>|<event2>#<X2>|...
         and returns a dict of the form:
 
         {
-            <path>: <X>,
-            <path2>: <X2>,
+            <event>: <X>,
+            <event2>: <X2>,
             ...
         }
 
@@ -105,59 +136,56 @@ class Redis(BaseAnalyticsBackend):
         for substr in l:
             split_substr = substr.split('#')
             try:
-                d[split_substr[0]] = int(split_substr[1])
+                key = self._reverse_clean_string(split_substr[0])
+                value = self._reverse_clean_string(split_substr[1])
+                d[key] = int(value)
             except ValueError:
                 # If the int conversion fails, that means we have a string, so store it.
-                d[split_substr[0]] = split_substr[1]
-            except IndexError:
-                d['ru'] = split_substr[0]
+                d[key] = value
 
         return d
 
-    def track_uncountable(self, user_id, path_type, paths):
+    def track_uncountable(self, user_id, event_id, events):
         """
         Arguments:
             uid: a unique id - in our case, the user's primary key
-            path_type: (string) - check self._legal_path_types for legal path types.
-            paths: (dict) - a dictionary of the form: {'direct_signup:pro_gold': 1, 'choose_tier:pro': 2}
-                where the key is the path and the value is the number of times that path was seen.
+            event_id: (string) - check self._legal_event_ids for legal path types.
+            events: (dict) - a dictionary of the form: {'event1': 1, 'event2': 2}
+                where the key is the event and the value is the number of times that event occured.
 
         The function stores a redis hash of the form
-            key = 'ttr:<uid>', field = path_type, value = paths (converted into our path format)
+            key = 'ttr:<uid>', field = event_id, value = events (converted into our event format)
         """
-        if path_type not in self._legal_path_types:
-            raise Exception("Please enter a legal path type: %s" % ' or '.join(self._legal_path_types))
 
-        r = self._tracker.hset(self._hashkey(user_id, path_type), self._nowstring, self._dict_to_string(paths))
+        r = self._analytics_backend.hset(self._hashkey(user_id, event_id), self._nowstring, self._dict_to_string(events))
 
         return r
 
-    def get_uncountable_for_user(self, user_id, path_type):
+    def get_uncountable_for_user(self, user_id, event_id):
         """
-        Gets the paths for a single user_id of the given path_type.
+        Gets the events for a single user_id of the given event_id.
         """
-        key = self._hashkey(user_id, path_type)
+        key = self._hashkey(user_id, event_id)
 
-        values = self._tracker.hgetall(key)
+        values = self._analytics_backend.hgetall(key)
 
         final_dict = {datetime.datetime.strptime(i, self._time_format): self._string_to_dict(values[i])
             for i in values.keys()}
 
         return final_dict
 
-    def get_uncountable(self, path_type):
+    def get_uncountable(self, event_id):
         """
-        Gets all paths for all user ids.
+        Gets all events for all user ids.
         """
-        pattern = "*|item:%s" % path_type
+        pattern = "*|item:%s" % event_id
 
-        keys = self._tracker.keys(pattern)
+        keys = self._analytics_backend.keys(pattern)
 
         if len(keys) == 0:
             return {}
 
-        with self._tracker.map() as conn:
-            d = {self._id_regex.match(key).groups()[0]: conn.hgetall(key) for key in keys}
+        d = {self._id_regex.match(key).groups()[0]: self._analytics_backend.hgetall(key) for key in keys}
 
         # Clean up the data for quick access - and convert strings to python variables.
         final_dict = {}

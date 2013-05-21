@@ -589,3 +589,25 @@ class TestRedisAnalyticsBackend(object):
         eq_(values["2012-04-16"], 3)
         eq_(values["2012-04-23"], 0)
         eq_(values["2012-04-30"], 1)
+
+    # Testing for uncountable tracking events
+    def test_track_uncountable(self):
+        self._redis_backend.flushdb()
+        user_id = 1234
+        user_id2 = 5678
+        metric = "metric1"
+        metric2 = "metric2"
+
+        events1 = {'saw_x': 1, 'saw_y': 2}
+        events2 = {'location': 'http://example.com/blah#a|b|c'}
+        # Track events for first user
+        self._backend.track_uncountable(user_id=user_id, event_id=metric, events=events1)
+        self._backend.track_uncountable(user_id=user_id, event_id=metric2, events=events2)
+
+        self._backend.track_uncountable(user_id=user_id2, event_id=metric, events=events1)
+        self._backend.track_uncountable(user_id=user_id2, event_id=metric2, events=events2)
+
+        eq_(self._backend.get_uncountable_for_user(user_id, metric).values(), [events1])
+        eq_(self._backend.get_uncountable_for_user(user_id, metric2).values(), [events2])
+
+        eq_(len(self._backend.get_uncountable('metric1').keys()), 2)
