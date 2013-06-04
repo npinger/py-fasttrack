@@ -74,35 +74,37 @@ Example Usage
     year_ago = datetime.date.today() - datetime.timedelta(days=265)
 
     #create some analytics data
-    tracker.track_metric("user:1234", "comment", year_ago)
-    tracker.track_metric("user:1234", "comment", year_ago, inc_amt=3)
+    # NOTE THAT ALL NUMBERS IN INITIAL ARGUMENTS ARE ASSUMED TO BE
+    # UNIQUE USER IDS
+    tracker.track_metric("1234", "comment", year_ago)
+    tracker.track_metric("1234", "comment", year_ago, inc_amt=3)
     #we can even track multiple metrics at the same time for a particular user
-    tracker.track_metric("user:1234", ["comments", "likes"], year_ago)
+    tracker.track_metric("1234", ["comments", "likes"], year_ago)
     #or track the same metric for multiple users (or a combination or both)
-    tracker.track_metric(["user:1234", "user:4567"], "comment", year_ago)
+    tracker.track_metric(["1234", "4567"], "comment", year_ago)
 
     #retrieve analytics data:
-    tracker.get_metric_by_day("user:1234", "comment", year_ago, limit=20)
-    tracker.get_metric_by_week("user:1234", "comment", year_ago, limit=10)
-    tracker.get_metric_by_month("user:1234", "comment", year_ago, limit=6)
+    tracker.get_metric_by_day("1234", "comment", year_ago, limit=20)
+    tracker.get_metric_by_week("1234", "comment", year_ago, limit=10)
+    tracker.get_metric_by_month("1234", "comment", year_ago, limit=6)
 
     #create a counter
-    tracker.track_count("user:1245", "login")
-    tracker.track_count("user:1245", "login", inc_amt=3)
+    tracker.track_count("1245", "login")
+    tracker.track_count("1245", "login", inc_amt=3)
 
     #retrieve multiple metrics at the same time
     #group_by is one of ``month``, ``week`` or ``day``
-    tracker.get_metrics([("user:1234", "login",), ("user:4567", "login",)], year_ago, group_by="day")
+    tracker.get_metrics([("1234", "login",), ("4567", "login",)], year_ago, group_by="day")
     >> [....]
 
     #retrieve a count
-    tracker.get_count("user:1245", "login")
+    tracker.get_count("1245", "login")
 
     #retrieve a count between 2 dates
-    tracker.get_count("user:1245", "login", start_date=datetime.date(month=1, day=5, year=2011), end_date=datetime.date(month=5, day=15, year=2011))
+    tracker.get_count("1245", "login", start_date=datetime.date(month=1, day=5, year=2011), end_date=datetime.date(month=5, day=15, year=2011))
 
     #retrieve counts
-    tracker.get_counts([("user:1245", "login",), ("user:1245", "logout",)])
+    tracker.get_counts([("1245", "login",), ("1245", "logout",)])
 
 
 BACKWARDS INCOMPATIBLE CHANGES

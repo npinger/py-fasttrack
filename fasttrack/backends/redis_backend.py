@@ -52,11 +52,23 @@ class Redis(BaseAnalyticsBackend):
         self._item_regex = re.compile(r'ttr:[0-9]+\|item:(.*)')
 
     def __del__(self):
-        self._date_to_yy_mm.reset()
-        self._date_to_yy_mm_dd.reset()
-        self._date_to_yy.reset()
-        self._get_iterator_tools.reset()
-        self._get_date_string_series.reset()
+        """
+        We clear out the memoized values when objects are deleted.
+        See the memoized class in ./fastrack/utils.py
+        """
+        try:
+            self._date_to_yy_mm.reset()
+            self._date_to_yy_mm_dd.reset()
+            self._date_to_yy.reset()
+            self._get_iterator_tools.reset()
+            self._get_date_string_series.reset()
+        except AttributeError:
+            # AttributeErrors show up as the program is being deconstructed
+            # because the functions on which we are calling reset() are deleted
+            # before this __del__ is called.
+            # Thus, .partial attribute (defined in utils.memoized) is nowhere to
+            # be found on the NoneType object that remains
+            pass
 
     ###################################
     # Uncountable Tracking
